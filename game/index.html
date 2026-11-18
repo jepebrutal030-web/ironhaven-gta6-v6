@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>IRONHAVEN — Open-World Crime</title>
+<link rel="icon" href="data:,">
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #0c1016;
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif; color: #eef1f5; }
+  #game { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+  #hud { position: fixed; inset: 0; pointer-events: none; z-index: 5; }
+  #money { position: absolute; top: 14px; left: 18px; font-size: 30px; font-weight: 800;
+    color: #7ee2a0; text-shadow: 0 2px 6px #000; }
+  #stars { position: absolute; top: 50px; left: 18px; font-size: 26px; letter-spacing: 3px;
+    color: #ffd34a; text-shadow: 0 2px 6px #000; }
+  #mission-name { position: absolute; top: 14px; right: 18px; font-size: 13px; letter-spacing: 2px;
+    color: #ffd34a; text-shadow: 0 2px 4px #000; text-align: right; }
+  #objective { position: absolute; top: 96px; left: 18px; font-size: 17px; font-weight: 600;
+    text-shadow: 0 2px 6px #000; }
+  #objective-dist { color: #ffd34a; margin-left: 8px; }
+  #health-wrap { position: absolute; bottom: 22px; left: 18px; width: 220px; }
+  #health-label { font-size: 12px; letter-spacing: 2px; color: #cfd6de; text-shadow: 0 1px 4px #000; }
+  #health-bar { height: 12px; background: rgba(0,0,0,.55); border: 1px solid rgba(255,255,255,.35); margin-top: 3px; }
+  #health-fill { height: 100%; width: 100%; background: linear-gradient(90deg, #37c978, #7ee2a0); }
+  #speed { position: absolute; bottom: 22px; right: 18px; font-size: 34px; font-weight: 800;
+    text-shadow: 0 2px 6px #000; }
+  #ammo { position: absolute; bottom: 66px; right: 18px; font-size: 16px; font-weight: 700;
+    color: #ffd34a; text-shadow: 0 2px 4px #000; }
+  #minimap { position: absolute; bottom: 22px; right: 210px; width: 180px; height: 180px;
+    border: 2px solid rgba(255,255,255,.45); background: rgba(10,14,20,.7); }
+  #crosshair { position: absolute; left: 50%; top: 50%; width: 22px; height: 22px; margin: -11px 0 0 -11px;
+    display: none; }
+  #crosshair::before, #crosshair::after { content: ""; position: absolute; background: #fff;
+    box-shadow: 0 0 3px #000; }
+  #crosshair::before { left: 10px; top: 0; width: 2px; height: 22px; }
+  #crosshair::after { left: 0; top: 10px; width: 22px; height: 2px; }
+  #hitmarker { position: absolute; left: 50%; top: 50%; width: 30px; height: 30px; margin: -15px 0 0 -15px;
+    opacity: 0; transition: opacity .12s; }
+  #hitmarker::before, #hitmarker::after { content: ""; position: absolute; background: #ff4444;
+    width: 30px; height: 3px; top: 13px; }
+  #hitmarker::before { transform: rotate(45deg); }
+  #hitmarker::after { transform: rotate(-45deg); }
+  #vignette { position: absolute; inset: 0; opacity: 0; transition: opacity .18s;
+    background: radial-gradient(ellipse at center, transparent 55%, rgba(200,0,0,.55) 100%); }
+  #toast { position: absolute; top: 150px; left: 50%; transform: translateX(-50%);
+    font-size: 20px; font-weight: 700; color: #ffd34a; text-shadow: 0 2px 6px #000;
+    opacity: 0; transition: opacity .4s; text-align: center; white-space: nowrap; }
+  .screen { position: fixed; inset: 0; display: none; align-items: center; justify-content: center;
+    flex-direction: column; z-index: 10; pointer-events: none;
+    background: linear-gradient(180deg, rgba(8,12,20,.55), rgba(8,12,20,.82)); text-align: center; }
+  .screen h1 { font-size: 64px; margin: 0; letter-spacing: 6px; color: #ffd34a;
+    text-shadow: 0 4px 18px #000; }
+  .screen h2 { font-size: 34px; margin: 0 0 8px; letter-spacing: 3px; }
+  .screen p { font-size: 17px; color: #cfd6de; max-width: 560px; line-height: 1.5; margin: 10px 0; }
+  .screen button { pointer-events: auto; font-size: 19px; font-weight: 700; padding: 13px 34px;
+    margin: 8px; border: 2px solid #ffd34a; background: #1a2230; color: #ffd34a; cursor: pointer; }
+  .screen button:hover { background: #ffd34a; color: #111; }
+  .screen .keys { font-size: 14px; color: #9aa4b0; margin-top: 14px; line-height: 1.7; }
+  #screen-title { display: flex; }
+</style>
+<script type="importmap">
+{ "imports": { "three": "./vendor/three/three.module.min.js" } }
+</script>
+</head>
+<body>
+<canvas id="game" aria-label="IRONHAVEN: an open-world crime game. Walk and drive around the city, steal cars, run missions, evade the police."></canvas>
+<div id="hud">
+  <div id="money">$0</div>
+  <div id="stars">☆☆☆☆☆</div>
+  <div id="mission-name">MISSION 1/5</div>
+  <div id="objective"><span id="objective-text"></span><span id="objective-dist"></span></div>
+  <div id="health-wrap"><div id="health-label">HEALTH</div><div id="health-bar"><div id="health-fill"></div></div></div>
+  <div id="speed"></div>
+  <div id="ammo"></div>
+  <canvas id="minimap" width="180" height="180"></canvas>
+  <div id="crosshair"></div>
+  <div id="hitmarker"></div>
+  <div id="vignette"></div>
+  <div id="toast"></div>
+</div>
+
+<div class="screen" id="screen-title">
+  <h1>IRONHAVEN</h1>
+  <p>An open-world crime story, all original. Steal cars, run five missions for the
+  Ironhaven crew, and stay ahead of the police — or get busted trying.</p>
+  <div>
+    <button id="btn-new">NEW GAME</button>
+    <button id="btn-continue">CONTINUE</button>
+  </div>
+  <div class="keys">WASD move / drive &nbsp;·&nbsp; Mouse look (click to lock) &nbsp;·&nbsp; Shift sprint / boost<br>
+  E enter car &nbsp;·&nbsp; Left-click shoot &nbsp;·&nbsp; R reload &nbsp;·&nbsp; Space jump / handbrake<br>
+  P pause &amp; save &nbsp;·&nbsp; M mute</div>
+</div>
+
+<div class="screen" id="screen-pause">
+  <h2>PAUSED</h2>
+  <p>Your progress is saved.</p>
+  <div><button id="btn-resume">RESUME</button></div>
+</div>
+
+<div class="screen" id="screen-busted">
+  <h2>BUSTED</h2>
+  <p>The Ironhaven police caught you. You walk free with a warning — this time.</p>
+  <div><button id="btn-busted">RESPAWN</button></div>
+</div>
+
+<div class="screen" id="screen-wasted">
+  <h2>WASTED</h2>
+  <p>You went down in Ironhaven. The crew drags you back to the hideout.</p>
+  <div><button id="btn-wasted">RESPAWN</button></div>
+</div>
+
+<div class="screen" id="screen-ending">
+  <h2>IRONHAVEN IS YOURS</h2>
+  <p>All five jobs done. The golden Manta is parked at the harbor, the crew is paid,
+  and the city is wide open. Free roam — keep driving.</p>
+  <div><button id="btn-ending">KEEP PLAYING</button></div>
+</div>
+
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>
